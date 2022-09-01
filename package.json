@@ -5,6 +5,7 @@
     "hardhat": "^2.10.2"
   },
   "dependencies": {
+    "bn.js": "^5.2.1",
     "hardhat-tracer": "^1.1.0-rc.8"
   }
 }

